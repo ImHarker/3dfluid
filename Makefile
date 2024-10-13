@@ -1,8 +1,8 @@
-CPP = g++ -Wall 
+CPP = g++ 
 SRCS = main.cpp fluid_solver.cpp EventManager.cpp
-
+FLAGS = -Wall -O3 -pg -funroll-loops
 all:
-	$(CPP) $(SRCS) -o fluid_sim
+	$(CPP) $(SRCS) $(FLAGS) -o fluid_sim
 
 clean:
 	@echo Cleaning up...

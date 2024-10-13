@@ -24,20 +24,20 @@ void set_bnd(int M, int N, int O, int b, float *x) {
   int i, j;
 
   // Set boundary on faces
-  for (i = 1; i <= M; i++) {
-    for (j = 1; j <= N; j++) {
+ for (j = 1; j <= N; j++) {
+    for (i = 1; i <= M; i++) {
       x[IX(i, j, 0)] = b == 3 ? -x[IX(i, j, 1)] : x[IX(i, j, 1)];
       x[IX(i, j, O + 1)] = b == 3 ? -x[IX(i, j, O)] : x[IX(i, j, O)];
     }
   }
-  for (i = 1; i <= N; i++) {
-    for (j = 1; j <= O; j++) {
+  for (j = 1; j <= O; j++) {
+    for (i = 1; i <= N; i++) {
       x[IX(0, i, j)] = b == 1 ? -x[IX(1, i, j)] : x[IX(1, i, j)];
       x[IX(M + 1, i, j)] = b == 1 ? -x[IX(M, i, j)] : x[IX(M, i, j)];
     }
   }
-  for (i = 1; i <= M; i++) {
-    for (j = 1; j <= O; j++) {
+  for (j = 1; j <= O; j++) {
+    for (i = 1; i <= M; i++) {
       x[IX(i, 0, j)] = b == 2 ? -x[IX(i, 1, j)] : x[IX(i, 1, j)];
       x[IX(i, N + 1, j)] = b == 2 ? -x[IX(i, N, j)] : x[IX(i, N, j)];
     }
@@ -57,9 +57,9 @@ void set_bnd(int M, int N, int O, int b, float *x) {
 void lin_solve(int M, int N, int O, int b, float *x, float *x0, float a,
                float c) {
   for (int l = 0; l < LINEARSOLVERTIMES; l++) {
-    for (int i = 1; i <= M; i++) {
+    for (int k = 1; k <= O; k++) {
       for (int j = 1; j <= N; j++) {
-        for (int k = 1; k <= O; k++) {
+        for (int i = 1; i <= M; i++) {
           x[IX(i, j, k)] = (x0[IX(i, j, k)] +
                             a * (x[IX(i - 1, j, k)] + x[IX(i + 1, j, k)] +
                                  x[IX(i, j - 1, k)] + x[IX(i, j + 1, k)] +
