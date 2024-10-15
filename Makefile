@@ -1,10 +1,21 @@
 CPP = g++ 
 SRCS = main.cpp fluid_solver.cpp EventManager.cpp
-FLAGS = -Wall -O3 -pg -funroll-loops
+FLAGS = -Wall -Ofast -funroll-loops -ftree-vectorize -mtune=native
+FLAGS_PROFILE = -pg
+
+TARGET = fluid_sim
+
 all:
-	$(CPP) $(SRCS) $(FLAGS) -o fluid_sim
+	@echo Building Release Version
+	$(CPP) $(SRCS) $(FLAGS) -o $(TARGET)
+		@echo "Build complete."
+
+profile:
+	@echo Building Profiling Version
+	$(CPP) $(SRCS) $(FLAGS) $(FLAGS_PROFILE) -o $(TARGET)
+	@echo "Profiling build complete."
 
 clean:
 	@echo Cleaning up...
-	@rm fluid
+	@rm $(TARGET)
 	@echo Done.
