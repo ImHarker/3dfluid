@@ -63,10 +63,12 @@ void set_bnd(int M, int N, int O, int b, float* x)
 }
 
 // Linear solve for implicit methods (diffusion)
+
 #if 0
-void lin_solve(int M, int N, int O, int b, float *x, float *x0, float a,
-               float c) {
-                //ORIGINAL
+
+void lin_solve(int M, int N, int O, int b, float *x, float *x0, float a, float c) {
+ 
+ //ORIGINAL
   for (int l = 0; l < LINEARSOLVERTIMES; l++) {
     for (int i = 1; i <= M; i++) {
       for (int j = 1; j <= N; j++) {
@@ -82,7 +84,9 @@ void lin_solve(int M, int N, int O, int b, float *x, float *x0, float a,
     set_bnd(M, N, O, b, x);
   }
 }
+
 #elif 0
+
 void lin_solve(int M, int N, int O, int b, float *x, float *x0, float a, float c) {
 
     //BUFFER: POC doesnt work
@@ -114,7 +118,9 @@ void lin_solve(int M, int N, int O, int b, float *x, float *x0, float a, float c
 
     free(temp); // Free temp buffer
 }
+
 #else
+
 void lin_solve(int M, int N, int O, int b, float* x, float* x0, float a, float c)
 {
     constexpr int BLOCK_SIZE = 8;
@@ -149,7 +155,9 @@ void lin_solve(int M, int N, int O, int b, float* x, float* x0, float a, float c
         set_bnd(M, N, O, b, x);
     }
 }
+
 #endif
+
 // Diffusion step (uses implicit method)
 void diffuse(int M, int N, int O, int b, float* x, float* x0, float diff,
              float dt)
@@ -165,12 +173,9 @@ void advect(int M, int N, int O, int b, float* d, float* d0, float* u, float* v,
 {
     float dtX = dt * M, dtY = dt * N, dtZ = dt * O;
 
-    for (int i = 1; i <= M; i++)
-    {
-        for (int j = 1; j <= N; j++)
-        {
-            for (int k = 1; k <= O; k++)
-            {
+    for (int k = 1; k <= O; k++) {
+        for (int j = 1; j <= N; j++) {
+            for (int i = 1; i <= M; i++) {
                 float x = i - dtX * u[IX(i, j, k)];
                 float y = j - dtY * v[IX(i, j, k)];
                 float z = k - dtZ * w[IX(i, j, k)];
@@ -213,12 +218,9 @@ void advect(int M, int N, int O, int b, float* d, float* d0, float* u, float* v,
 void project(int M, int N, int O, float* u, float* v, float* w, float* p,
              float* div)
 {
-    for (int i = 1; i <= M; i++)
-    {
-        for (int j = 1; j <= N; j++)
-        {
-            for (int k = 1; k <= O; k++)
-            {
+    for (int k = 1; k <= O; k++) {
+        for (int j = 1; j <= N; j++) {
+            for (int i = 1; i <= M; i++) {
                 div[IX(i, j, k)] =
                     -0.5f *
                     (u[IX(i + 1, j, k)] - u[IX(i - 1, j, k)] + v[IX(i, j + 1, k)] -
@@ -233,12 +235,9 @@ void project(int M, int N, int O, float* u, float* v, float* w, float* p,
     set_bnd(M, N, O, 0, p);
     lin_solve(M, N, O, 0, p, div, 1, 6);
 
-    for (int i = 1; i <= M; i++)
-    {
-        for (int j = 1; j <= N; j++)
-        {
-            for (int k = 1; k <= O; k++)
-            {
+    for (int k = 1; k <= O; k++) {
+        for (int j = 1; j <= N; j++) {
+            for (int i = 1; i <= M; i++) {
                 u[IX(i, j, k)] -= 0.5f * (p[IX(i + 1, j, k)] - p[IX(i - 1, j, k)]);
                 v[IX(i, j, k)] -= 0.5f * (p[IX(i, j + 1, k)] - p[IX(i, j - 1, k)]);
                 w[IX(i, j, k)] -= 0.5f * (p[IX(i, j, k + 1)] - p[IX(i, j, k - 1)]);
