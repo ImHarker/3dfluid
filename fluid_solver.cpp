@@ -1,52 +1,44 @@
 #include "fluid_solver.h"
+
 #include <cmath>
 
 #define IX(i, j, k) ((i) + (M + 2) * (j) + (M + 2) * (N + 2) * (k))
-#define SWAP(x0, x)                                                            \
-  {                                                                            \
-    float *tmp = x0;                                                           \
-    x0 = x;                                                                    \
-    x = tmp;                                                                   \
-  }
+#define SWAP(x0, x)      \
+    {                    \
+        float* tmp = x0; \
+        x0 = x;          \
+        x = tmp;         \
+    }
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
 #define LINEARSOLVERTIMES 20
 
 // Add sources (density or velocity)
-void add_source(int M, int N, int O, float* x, float* s, float dt)
-{
+void add_source(int M, int N, int O, float* x, float* s, float dt) {
     int size = (M + 2) * (N + 2) * (O + 2);
-    for (int i = 0; i < size; i++)
-    {
+    for (int i = 0; i < size; i++) {
         x[i] += dt * s[i];
     }
 }
 
 // Set boundary conditions
-void set_bnd(int M, int N, int O, int b, float* x)
-{
+void set_bnd(int M, int N, int O, int b, float* x) {
     int i, j;
 
     // Set boundary on faces
-    for (j = 1; j <= N; j++)
-    {
-        for (i = 1; i <= M; i++)
-        {
+    for (j = 1; j <= N; j++) {
+        for (i = 1; i <= M; i++) {
             x[IX(i, j, 0)] = b == 3 ? -x[IX(i, j, 1)] : x[IX(i, j, 1)];
             x[IX(i, j, O + 1)] = b == 3 ? -x[IX(i, j, O)] : x[IX(i, j, O)];
         }
     }
-    for (j = 1; j <= O; j++)
-    {
-        for (i = 1; i <= N; i++)
-        {
+    for (j = 1; j <= O; j++) {
+        for (i = 1; i <= N; i++) {
             x[IX(0, i, j)] = b == 1 ? -x[IX(1, i, j)] : x[IX(1, i, j)];
             x[IX(M + 1, i, j)] = b == 1 ? -x[IX(M, i, j)] : x[IX(M, i, j)];
         }
     }
-    for (j = 1; j <= O; j++)
-    {
-        for (i = 1; i <= M; i++)
-        {
+    for (j = 1; j <= O; j++) {
+        for (i = 1; i <= M; i++) {
             x[IX(i, 0, j)] = b == 2 ? -x[IX(i, 1, j)] : x[IX(i, 1, j)];
             x[IX(i, N + 1, j)] = b == 2 ? -x[IX(i, N, j)] : x[IX(i, N, j)];
         }
@@ -59,47 +51,45 @@ void set_bnd(int M, int N, int O, int b, float* x)
     x[IX(0, N + 1, 0)] =
         0.33f * (x[IX(1, N + 1, 0)] + x[IX(0, N, 0)] + x[IX(0, N + 1, 1)]);
     x[IX(M + 1, N + 1, 0)] = 0.33f * (x[IX(M, N + 1, 0)] + x[IX(M + 1, N, 0)] +
-        x[IX(M + 1, N + 1, 1)]);
+                                      x[IX(M + 1, N + 1, 1)]);
 }
 
 // Linear solve for implicit methods (diffusion)
 
 #if 0
 
-void lin_solve(int M, int N, int O, int b, float *x, float *x0, float a, float c) {
- 
- //ORIGINAL
-  for (int l = 0; l < LINEARSOLVERTIMES; l++) {
-    for (int i = 1; i <= M; i++) {
-      for (int j = 1; j <= N; j++) {
-        for (int k = 1; k <= O; k++) {
-          x[IX(i, j, k)] = (x0[IX(i, j, k)] +
-                            a * (x[IX(i - 1, j, k)] + x[IX(i + 1, j, k)] +
-                                 x[IX(i, j - 1, k)] + x[IX(i, j + 1, k)] +
-                                 x[IX(i, j, k - 1)] + x[IX(i, j, k + 1)])) /
-                           c;
+void lin_solve(int M, int N, int O, int b, float* x, float* x0, float a, float c) {
+    // ORIGINAL
+    for (int l = 0; l < LINEARSOLVERTIMES; l++) {
+        for (int i = 1; i <= M; i++) {
+            for (int j = 1; j <= N; j++) {
+                for (int k = 1; k <= O; k++) {
+                    x[IX(i, j, k)] = (x0[IX(i, j, k)] +
+                                      a * (x[IX(i - 1, j, k)] + x[IX(i + 1, j, k)] +
+                                           x[IX(i, j - 1, k)] + x[IX(i, j + 1, k)] +
+                                           x[IX(i, j, k - 1)] + x[IX(i, j, k + 1)])) /
+                                     c;
+                }
+            }
         }
-      }
+        set_bnd(M, N, O, b, x);
     }
-    set_bnd(M, N, O, b, x);
-  }
 }
 
 #elif 0
 
-void lin_solve(int M, int N, int O, int b, float *x, float *x0, float a, float c) {
-
-    //BUFFER: POC doesnt work
-    float *temp = (float*)malloc((M + 2) * (N + 2) * (O + 2) * sizeof(float)); // temp buffer
+void lin_solve(int M, int N, int O, int b, float* x, float* x0, float a, float c) {
+    // BUFFER: POC doesnt work
+    float* temp = (float*)malloc((M + 2) * (N + 2) * (O + 2) * sizeof(float));  // temp buffer
 
     for (int l = 0; l < LINEARSOLVERTIMES; l++) {
         for (int k = 1; k <= O; k++) {
             for (int j = 1; j <= N; j++) {
                 for (int i = 1; i <= M; i++) {
                     temp[IX(i, j, k)] = (x0[IX(i, j, k)] +
-                                        a * (x[IX(i - 1, j, k)] + x[IX(i + 1, j, k)] +
-                                             x[IX(i, j - 1, k)] + x[IX(i, j + 1, k)] +
-                                             x[IX(i, j, k - 1)] + x[IX(i, j, k + 1)])) /
+                                         a * (x[IX(i - 1, j, k)] + x[IX(i + 1, j, k)] +
+                                              x[IX(i, j - 1, k)] + x[IX(i, j + 1, k)] +
+                                              x[IX(i, j, k - 1)] + x[IX(i, j, k + 1)])) /
                                         c;
                 }
             }
@@ -116,36 +106,29 @@ void lin_solve(int M, int N, int O, int b, float *x, float *x0, float a, float c
         set_bnd(M, N, O, b, x);
     }
 
-    free(temp); // Free temp buffer
+    free(temp);  // Free temp buffer
 }
 
 #else
 
-void lin_solve(int M, int N, int O, int b, float* x, float* x0, float a, float c)
-{
-    constexpr int BLOCK_SIZE = 8;
+void lin_solve(int M, int N, int O, int b, float* x, float* x0, float a, float c) {
+    constexpr int BLOCK_SIZE = 4; //4 = melhor tempo | 2 = menos cache misses
     const float cRecip = 1.0f / c;
     const int jOffset = (M + 2);
     const int kOffset = jOffset * (N + 2);
-    for (int l = 0; l < LINEARSOLVERTIMES; ++l)
-    {
-        for (int k = 1; k <= O; k += BLOCK_SIZE)
-        {
-            for (int j = 1; j <= N; j += BLOCK_SIZE)
-            {
-                for (int i = 1; i <= M; i += BLOCK_SIZE)
-                {
-                    for (int kBlock = k; kBlock < k + BLOCK_SIZE && kBlock <= O; kBlock++)
-                    {
-                        for (int jBlock = j; jBlock < j + BLOCK_SIZE && jBlock <= N; jBlock++)
-                        {
-                            for (int iBlock = i; iBlock < i + BLOCK_SIZE && iBlock <= M; iBlock++)
-                            {
+    for (int l = 0; l < LINEARSOLVERTIMES; ++l) {
+        for (int k = 1; k <= O; k += BLOCK_SIZE) {
+            for (int j = 1; j <= N; j += BLOCK_SIZE) {
+                for (int i = 1; i <= M; i += BLOCK_SIZE) {
+                    for (int kBlock = k; kBlock < k + BLOCK_SIZE && kBlock <= O; kBlock++) {
+                        for (int jBlock = j; jBlock < j + BLOCK_SIZE && jBlock <= N; jBlock++) {
+                            for (int iBlock = i; iBlock < i + BLOCK_SIZE && iBlock <= M; iBlock++) {
                                 int index = IX(iBlock, jBlock, kBlock);
                                 x[index] = (x0[index] +
-                                    a * (x[index-1] + x[index+1] +
-                                        x[index - jOffset] + x[index + jOffset] +
-                                        x[index - kOffset] + x[index + kOffset])) * cRecip;
+                                            a * (x[index - 1] + x[index + 1] +
+                                                 x[index - jOffset] + x[index + jOffset] +
+                                                 x[index - kOffset] + x[index + kOffset])) *
+                                           cRecip;
                             }
                         }
                     }
@@ -160,8 +143,7 @@ void lin_solve(int M, int N, int O, int b, float* x, float* x0, float a, float c
 
 // Diffusion step (uses implicit method)
 void diffuse(int M, int N, int O, int b, float* x, float* x0, float diff,
-             float dt)
-{
+             float dt) {
     int max = MAX(MAX(M, N), O);
     float a = dt * diff * max * max;
     lin_solve(M, N, O, b, x, x0, a, 1 + 6 * a);
@@ -169,8 +151,7 @@ void diffuse(int M, int N, int O, int b, float* x, float* x0, float diff,
 
 // Advection step (uses velocity field to move quantities)
 void advect(int M, int N, int O, int b, float* d, float* d0, float* u, float* v,
-            float* w, float dt)
-{
+            float* w, float dt) {
     float dtX = dt * M, dtY = dt * N, dtZ = dt * O;
 
     for (int k = 1; k <= O; k++) {
@@ -204,9 +185,9 @@ void advect(int M, int N, int O, int b, float* d, float* d0, float* u, float* v,
 
                 d[IX(i, j, k)] =
                     s0 * (t0 * (u0 * d0[IX(i0, j0, k0)] + u1 * d0[IX(i0, j0, k1)]) +
-                        t1 * (u0 * d0[IX(i0, j1, k0)] + u1 * d0[IX(i0, j1, k1)])) +
+                          t1 * (u0 * d0[IX(i0, j1, k0)] + u1 * d0[IX(i0, j1, k1)])) +
                     s1 * (t0 * (u0 * d0[IX(i1, j0, k0)] + u1 * d0[IX(i1, j0, k1)]) +
-                        t1 * (u0 * d0[IX(i1, j1, k0)] + u1 * d0[IX(i1, j1, k1)]));
+                          t1 * (u0 * d0[IX(i1, j1, k0)] + u1 * d0[IX(i1, j1, k1)]));
             }
         }
     }
@@ -216,15 +197,14 @@ void advect(int M, int N, int O, int b, float* d, float* d0, float* u, float* v,
 // Projection step to ensure incompressibility (make the velocity field
 // divergence-free)
 void project(int M, int N, int O, float* u, float* v, float* w, float* p,
-             float* div)
-{
+             float* div) {
     for (int k = 1; k <= O; k++) {
         for (int j = 1; j <= N; j++) {
             for (int i = 1; i <= M; i++) {
                 div[IX(i, j, k)] =
                     -0.5f *
                     (u[IX(i + 1, j, k)] - u[IX(i - 1, j, k)] + v[IX(i, j + 1, k)] -
-                        v[IX(i, j - 1, k)] + w[IX(i, j, k + 1)] - w[IX(i, j, k - 1)]) /
+                     v[IX(i, j - 1, k)] + w[IX(i, j, k + 1)] - w[IX(i, j, k - 1)]) /
                     MAX(M, MAX(N, O));
                 p[IX(i, j, k)] = 0;
             }
@@ -251,8 +231,7 @@ void project(int M, int N, int O, float* u, float* v, float* w, float* p,
 
 // Step function for density
 void dens_step(int M, int N, int O, float* x, float* x0, float* u, float* v,
-               float* w, float diff, float dt)
-{
+               float* w, float diff, float dt) {
     add_source(M, N, O, x, x0, dt);
     SWAP(x0, x);
     diffuse(M, N, O, 0, x, x0, diff, dt);
@@ -262,8 +241,7 @@ void dens_step(int M, int N, int O, float* x, float* x0, float* u, float* v,
 
 // Step function for velocity
 void vel_step(int M, int N, int O, float* u, float* v, float* w, float* u0,
-              float* v0, float* w0, float visc, float dt)
-{
+              float* v0, float* w0, float visc, float dt) {
     add_source(M, N, O, u, u0, dt);
     add_source(M, N, O, v, v0, dt);
     add_source(M, N, O, w, w0, dt);
