@@ -112,7 +112,7 @@ void lin_solve(int M, int N, int O, int b, float* x, float* x0, float a, float c
 #else
 
 void lin_solve(int M, int N, int O, int b, float* x, float* x0, float a, float c) {
-    constexpr int BLOCK_SIZE = 4; //4 = melhor tempo | 2 = menos cache misses
+    constexpr int BLOCK_SIZE = 4;  // 4 = melhor tempo | 2 = menos cache misses
     const float cRecip = 1.0f / c;
     const int jOffset = (M + 2);
     const int kOffset = jOffset * (N + 2);

@@ -1,6 +1,6 @@
 CPP = g++ 
 SRCS = main.cpp fluid_solver.cpp EventManager.cpp
-FLAGS = -Wall -Ofast -funroll-loops -ftree-vectorize -mtune=native -march=native -flto -fomit-frame-pointer
+FLAGS = -Wall -Ofast -funroll-loops -ftree-vectorize -mtune=native -march=native
 FLAGS_PROFILE = -pg
 
 TARGET = fluid_sim
