@@ -76,39 +76,6 @@ void lin_solve(int M, int N, int O, int b, float* x, float* x0, float a, float c
     }
 }
 
-#elif 0
-
-void lin_solve(int M, int N, int O, int b, float* x, float* x0, float a, float c) {
-    // BUFFER: POC doesnt work
-    float* temp = (float*)malloc((M + 2) * (N + 2) * (O + 2) * sizeof(float));  // temp buffer
-
-    for (int l = 0; l < LINEARSOLVERTIMES; l++) {
-        for (int k = 1; k <= O; k++) {
-            for (int j = 1; j <= N; j++) {
-                for (int i = 1; i <= M; i++) {
-                    temp[IX(i, j, k)] = (x0[IX(i, j, k)] +
-                                         a * (x[IX(i - 1, j, k)] + x[IX(i + 1, j, k)] +
-                                              x[IX(i, j - 1, k)] + x[IX(i, j + 1, k)] +
-                                              x[IX(i, j, k - 1)] + x[IX(i, j, k + 1)])) /
-                                        c;
-                }
-            }
-        }
-
-        for (int k = 1; k <= O; k++) {
-            for (int j = 1; j <= N; j++) {
-                for (int i = 1; i <= M; i++) {
-                    x[IX(i, j, k)] = temp[IX(i, j, k)];
-                }
-            }
-        }
-
-        set_bnd(M, N, O, b, x);
-    }
-
-    free(temp);  // Free temp buffer
-}
-
 #else
 
 void lin_solve(int M, int N, int O, int b, float* x, float* x0, float a, float c) {
