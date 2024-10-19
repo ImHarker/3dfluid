@@ -57,7 +57,7 @@ void set_bnd(int M, int N, int O, int b, float* x) {
 // Linear solve for implicit methods (diffusion)
 
 #if 0
-
+// Original Code provided in the repo
 void lin_solve(int M, int N, int O, int b, float* x, float* x0, float a, float c) {
     // ORIGINAL
     for (int l = 0; l < LINEARSOLVERTIMES; l++) {
@@ -77,7 +77,7 @@ void lin_solve(int M, int N, int O, int b, float* x, float* x0, float a, float c
 }
 
 #elif 0
-
+// Buffer version that doesnt work. This was a test to evaluate performance if there wasnt data dependency between iterations.
 void lin_solve(int M, int N, int O, int b, float* x, float* x0, float a, float c) {
     // BUFFER: POC doesnt work
     float* temp = (float*)malloc((M + 2) * (N + 2) * (O + 2) * sizeof(float));  // temp buffer
@@ -110,7 +110,7 @@ void lin_solve(int M, int N, int O, int b, float* x, float* x0, float a, float c
 }
 
 #else
-
+// Final Code
 void lin_solve(int M, int N, int O, int b, float* x, float* x0, float a, float c) {
     constexpr int BLOCK_SIZE = 4;  // 4 = melhor tempo | 2 = menos cache misses
     const float cRecip = 1.0f / c;
