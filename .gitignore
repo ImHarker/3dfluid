@@ -270,3 +270,9 @@ __pycache__/
 
 .[Cc]langd*
 compile_commands.json
+vectorization_report.txt
+missed_report.txt
+fluid_sim
+gmon.out
+loop_report.txt
+inline_report.txt
