@@ -1,5 +1,7 @@
 #include "fluid_solver.h"
 
+#include <omp.h>
+
 #include <cmath>
 
 #define IX(i, j, k) ((i) + (M + 2) * (j) + (M + 2) * (N + 2) * (k))
@@ -142,36 +144,84 @@ void lin_solve(int M, int N, int O, int b, float* x, float* x0, float a, float c
 #else
 
 // red-black solver with convergence check
-void lin_solve(int M, int N, int O, int b, float *x, float *x0, float a, float c) {
+void lin_solve(int M, int N, int O, int b, float* x, float* x0, float a, float c) {
+    constexpr int BLOCK_SIZE = 4;
+    const int jOffset = (M + 2);
+    const int kOffset = jOffset * (N + 2);
     float tol = 1e-7, max_c, old_x, change;
     int l = 0;
-    
+
     do {
         max_c = 0.0f;
-        for (int i = 1; i <= M; i++) {
-            for (int j = 1; j <= N; j++) {
-                 for (int k = 1 + (i+j)%2; k <= O; k+=2) {
-                    old_x = x[IX(i, j, k)];
-                    x[IX(i, j, k)] = (x0[IX(i, j, k)] +
-                                      a * (x[IX(i - 1, j, k)] + x[IX(i + 1, j, k)] +
-                                           x[IX(i, j - 1, k)] + x[IX(i, j + 1, k)] +
-                                           x[IX(i, j, k - 1)] + x[IX(i, j, k + 1)])) /c;
-                    change = fabs(x[IX(i, j, k)] - old_x);
-                    if(change > max_c) max_c = change;
+
+        // Red points
+#pragma omp parallel private(old_x, change)
+        {
+            float local_max_c = 0.0f;  // Local max_c for each thread
+#pragma omp for collapse(3)  // Collapse loops to optimize scheduling
+            for (int k = 1; k <= O; k += BLOCK_SIZE) {
+                for (int j = 1; j <= N; j += BLOCK_SIZE) {
+                    for (int i = 1; i <= M; i += BLOCK_SIZE) {
+                        for (int kBlock = k; kBlock < k + BLOCK_SIZE && kBlock <= O; kBlock++) {
+                            for (int jBlock = j; jBlock < j + BLOCK_SIZE && jBlock <= N; jBlock++) {
+                                for (int iBlock = i; iBlock < i + BLOCK_SIZE && iBlock <= M; iBlock++) {
+                                    if ((iBlock + jBlock + kBlock) % 2 == 0) {  // Red points
+                                        int index = IX(iBlock, jBlock, kBlock);
+                                        old_x = x[index];
+                                        x[index] = (x0[index] +
+                                                    a * (x[index - 1] + x[index + 1] +
+                                                         x[index - jOffset] + x[index + jOffset] +
+                                                         x[index - kOffset] + x[index + kOffset])) /
+                                                   c;
+                                        change = fabs(x[index] - old_x);
+                                        if (change > local_max_c) local_max_c = change;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+#pragma omp critical
+            {
+                if (local_max_c > max_c) {
+                    max_c = local_max_c;  // Combine local results in a critical section
                 }
             }
         }
-        
-        for (int i = 1; i <= M; i++) {
-            for (int j = 1; j <= N; j++) {
-                for (int k = 1 + (i+j+1)%2; k <= O; k+=2) {
-                    old_x = x[IX(i, j, k)];
-                    x[IX(i, j, k)] = (x0[IX(i, j, k)] +
-                                      a * (x[IX(i - 1, j, k)] + x[IX(i + 1, j, k)] +
-                                           x[IX(i, j - 1, k)] + x[IX(i, j + 1, k)] +
-                                           x[IX(i, j, k - 1)] + x[IX(i, j, k + 1)])) /c;
-                    change = fabs(x[IX(i, j, k)] - old_x);
-                    if(change > max_c) max_c = change;
+
+        // Black points
+#pragma omp parallel private(old_x, change)
+        {
+            float local_max_c = 0.0f;  // Local max_c for each thread
+#pragma omp for collapse(3)
+            for (int k = 1; k <= O; k += BLOCK_SIZE) {
+                for (int j = 1; j <= N; j += BLOCK_SIZE) {
+                    for (int i = 1; i <= M; i += BLOCK_SIZE) {
+                        for (int kBlock = k; kBlock < k + BLOCK_SIZE && kBlock <= O; kBlock++) {
+                            for (int jBlock = j; jBlock < j + BLOCK_SIZE && jBlock <= N; jBlock++) {
+                                for (int iBlock = i; iBlock < i + BLOCK_SIZE && iBlock <= M; iBlock++) {
+                                    if ((iBlock + jBlock + kBlock) % 2 != 0) {  // Black points
+                                        int index = IX(iBlock, jBlock, kBlock);
+                                        old_x = x[index];
+                                        x[index] = (x0[index] +
+                                                    a * (x[index - 1] + x[index + 1] +
+                                                         x[index - jOffset] + x[index + jOffset] +
+                                                         x[index - kOffset] + x[index + kOffset])) /
+                                                   c;
+                                        change = fabs(x[index] - old_x);
+                                        if (change > local_max_c) local_max_c = change;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+#pragma omp critical
+            {
+                if (local_max_c > max_c) {
+                    max_c = local_max_c;  // Combine local results in a critical section
                 }
             }
         }

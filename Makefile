@@ -1,7 +1,9 @@
 CPP = g++ 
 SRCS = main.cpp fluid_solver.cpp EventManager.cpp
-FLAGS = -Wall -Ofast -funroll-loops -ftree-vectorize -mtune=native -march=native
-FLAGS_PROFILE = -pg
+FLAGS = -Wall -Ofast -funroll-loops -ftree-vectorize -mtune=native -march=native -fopenmp -g -fno-omit-frame-pointer
+FLAGS_PROFILE = -pg 
+
+THREADS = 40
 
 TARGET = fluid_sim
 
@@ -19,3 +21,11 @@ clean:
 	@echo Cleaning up...
 	@rm $(TARGET)
 	@echo Done.
+
+runseq:
+	@echo Running sequential...
+	export OMP_NUM_THREADS=1; ./$(TARGET)
+
+runpar:
+	@echo Running parallel...
+	export OMP_NUM_THREADS=$(THREADS); ./$(TARGET)
