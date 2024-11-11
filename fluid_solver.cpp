@@ -27,23 +27,29 @@ void set_bnd(int M, int N, int O, int b, float* x) {
     int i, j;
 
     // Set boundary on faces
+    #pragma omp parallel private(i,j)
+    {
+        #pragma omp for collapse(2)
     for (j = 1; j <= N; j++) {
         for (i = 1; i <= M; i++) {
             x[IX(i, j, 0)] = b == 3 ? -x[IX(i, j, 1)] : x[IX(i, j, 1)];
             x[IX(i, j, O + 1)] = b == 3 ? -x[IX(i, j, O)] : x[IX(i, j, O)];
         }
     }
+    #pragma omp for collapse(2)
     for (j = 1; j <= O; j++) {
         for (i = 1; i <= N; i++) {
             x[IX(0, i, j)] = b == 1 ? -x[IX(1, i, j)] : x[IX(1, i, j)];
             x[IX(M + 1, i, j)] = b == 1 ? -x[IX(M, i, j)] : x[IX(M, i, j)];
         }
     }
+    #pragma omp for collapse(2)
     for (j = 1; j <= O; j++) {
         for (i = 1; i <= M; i++) {
             x[IX(i, 0, j)] = b == 2 ? -x[IX(i, 1, j)] : x[IX(i, 1, j)];
             x[IX(i, N + 1, j)] = b == 2 ? -x[IX(i, N, j)] : x[IX(i, N, j)];
         }
+    }
     }
 
     // Set corners
@@ -188,12 +194,9 @@ void lin_solve(int M, int N, int O, int b, float* x, float* x0, float a, float c
                     max_c = local_max_c;  // Combine local results in a critical section
                 }
             }
-        }
 
-        // Black points
-#pragma omp parallel private(old_x, change)
-        {
-            float local_max_c = 0.0f;  // Local max_c for each thread
+            // Black points
+            local_max_c = 0.0f;  // Local max_c for each thread
 #pragma omp for collapse(3)
             for (int k = 1; k <= O; k += BLOCK_SIZE) {
                 for (int j = 1; j <= N; j += BLOCK_SIZE) {
@@ -243,7 +246,7 @@ void diffuse(int M, int N, int O, int b, float* x, float* x0, float diff,
 void advect(int M, int N, int O, int b, float* d, float* d0, float* u, float* v,
             float* w, float dt) {
     float dtX = dt * M, dtY = dt * N, dtZ = dt * O;
-
+#pragma omp parallel for collapse(3)
     for (int k = 1; k <= O; k++) {
         for (int j = 1; j <= N; j++) {
             for (int i = 1; i <= M; i++) {
@@ -288,6 +291,7 @@ void advect(int M, int N, int O, int b, float* d, float* d0, float* u, float* v,
 // divergence-free)
 void project(int M, int N, int O, float* u, float* v, float* w, float* p,
              float* div) {
+#pragma omp parallel for collapse(3)
     for (int k = 1; k <= O; k++) {
         for (int j = 1; j <= N; j++) {
             for (int i = 1; i <= M; i++) {
@@ -300,11 +304,10 @@ void project(int M, int N, int O, float* u, float* v, float* w, float* p,
             }
         }
     }
-
     set_bnd(M, N, O, 0, div);
     set_bnd(M, N, O, 0, p);
     lin_solve(M, N, O, 0, p, div, 1, 6);
-
+#pragma omp parallel for collapse(3)
     for (int k = 1; k <= O; k++) {
         for (int j = 1; j <= N; j++) {
             for (int i = 1; i <= M; i++) {
@@ -315,7 +318,9 @@ void project(int M, int N, int O, float* u, float* v, float* w, float* p,
         }
     }
     set_bnd(M, N, O, 1, u);
+
     set_bnd(M, N, O, 2, v);
+
     set_bnd(M, N, O, 3, w);
 }
 

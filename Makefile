@@ -3,7 +3,7 @@ SRCS = main.cpp fluid_solver.cpp EventManager.cpp
 FLAGS = -Wall -Ofast -funroll-loops -ftree-vectorize -mtune=native -march=native -fopenmp -g -fno-omit-frame-pointer
 FLAGS_PROFILE = -pg 
 
-THREADS = 40
+THREADS = 34
 
 TARGET = fluid_sim
 
