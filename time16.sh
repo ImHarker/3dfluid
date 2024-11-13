@@ -8,16 +8,14 @@
 module load gcc/11.2.0
 make
 
-max_threads=40
 
-threads=1
-while [ $threads -le $max_threads ]; do
+threads=16
     export OMP_NUM_THREADS=$threads
     echo "Running fluid_sim with $threads threads..."
 
     total_time=0  # Reset total_time for each thread count
 
-    for i in {1..3}; do
+    for i in {1..10}; do
         echo "Attempt $i with $threads threads..."
 
         # Capture the output of fluid_sim, including density
@@ -35,8 +33,8 @@ while [ $threads -le $max_threads ]; do
     done
 
     # Calculate and display the average time for the current thread count
-    avg_time=$(echo "scale=2; $total_time / 3" | bc)
-    echo "Average execution time over 3 runs with $threads threads: ${avg_time}s"
+    avg_time=$(echo "scale=2; $total_time / 10" | bc)
+    echo "Average execution time over 10 runs with $threads threads: ${avg_time}s"
     echo "--------------------------------------------"
     
     # Update threads: double if 1, otherwise increment by 2
@@ -45,4 +43,3 @@ while [ $threads -le $max_threads ]; do
     else
         threads=$((threads + 2))
     fi
-done

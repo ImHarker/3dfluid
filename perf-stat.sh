@@ -3,7 +3,7 @@
 #SBATCH --cpus-per-task=40
 #SBATCH --exclusive
 #SBATCH --partition=cpar
-#SBATCH --time=00:10:00
+#SBATCH --time=00:01:00
 
 
 module load gcc/11.2.0
