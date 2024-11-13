@@ -276,3 +276,9 @@ fluid_sim
 gmon.out
 loop_report.txt
 inline_report.txt
+graph.py
+main5.gprof
+perf.data
+perfreport
+slurm-*.out
+perf.data.old
