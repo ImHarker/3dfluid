@@ -1,8 +1,10 @@
-#include "fluid_solver.h"
-
+#include <cuda_runtime.h>
 #include <omp.h>
+#include <iostream>
 
 #include <cmath>
+
+#include "fluid_solver.h"
 
 #define IX(i, j, k) ((i) + (M + 2) * (j) + (M + 2) * (N + 2) * (k))
 #define SWAP(x0, x)      \
@@ -26,30 +28,30 @@ void add_source(int M, int N, int O, float* x, float* s, float dt) {
 void set_bnd(int M, int N, int O, int b, float* x) {
     int i, j;
 
-    // Set boundary on faces
-    #pragma omp parallel private(i,j)
+// Set boundary on faces
+#pragma omp parallel private(i, j)
     {
-        #pragma omp for collapse(2)
-    for (j = 1; j <= N; j++) {
-        for (i = 1; i <= M; i++) {
-            x[IX(i, j, 0)] = b == 3 ? -x[IX(i, j, 1)] : x[IX(i, j, 1)];
-            x[IX(i, j, O + 1)] = b == 3 ? -x[IX(i, j, O)] : x[IX(i, j, O)];
+#pragma omp for collapse(2)
+        for (j = 1; j <= N; j++) {
+            for (i = 1; i <= M; i++) {
+                x[IX(i, j, 0)] = b == 3 ? -x[IX(i, j, 1)] : x[IX(i, j, 1)];
+                x[IX(i, j, O + 1)] = b == 3 ? -x[IX(i, j, O)] : x[IX(i, j, O)];
+            }
         }
-    }
-    #pragma omp for collapse(2)
-    for (j = 1; j <= O; j++) {
-        for (i = 1; i <= N; i++) {
-            x[IX(0, i, j)] = b == 1 ? -x[IX(1, i, j)] : x[IX(1, i, j)];
-            x[IX(M + 1, i, j)] = b == 1 ? -x[IX(M, i, j)] : x[IX(M, i, j)];
+#pragma omp for collapse(2)
+        for (j = 1; j <= O; j++) {
+            for (i = 1; i <= N; i++) {
+                x[IX(0, i, j)] = b == 1 ? -x[IX(1, i, j)] : x[IX(1, i, j)];
+                x[IX(M + 1, i, j)] = b == 1 ? -x[IX(M, i, j)] : x[IX(M, i, j)];
+            }
         }
-    }
-    #pragma omp for collapse(2)
-    for (j = 1; j <= O; j++) {
-        for (i = 1; i <= M; i++) {
-            x[IX(i, 0, j)] = b == 2 ? -x[IX(i, 1, j)] : x[IX(i, 1, j)];
-            x[IX(i, N + 1, j)] = b == 2 ? -x[IX(i, N, j)] : x[IX(i, N, j)];
+#pragma omp for collapse(2)
+        for (j = 1; j <= O; j++) {
+            for (i = 1; i <= M; i++) {
+                x[IX(i, 0, j)] = b == 2 ? -x[IX(i, 1, j)] : x[IX(i, 1, j)];
+                x[IX(i, N + 1, j)] = b == 2 ? -x[IX(i, N, j)] : x[IX(i, N, j)];
+            }
         }
-    }
     }
 
     // Set corners
@@ -147,7 +149,7 @@ void lin_solve(int M, int N, int O, int b, float* x, float* x0, float a, float c
     }
 }
 
-#else
+#elif 0
 
 // red-black solver with convergence check
 void lin_solve(int M, int N, int O, int b, float* x, float* x0, float a, float c) {
@@ -230,6 +232,158 @@ void lin_solve(int M, int N, int O, int b, float* x, float* x0, float a, float c
         }
         set_bnd(M, N, O, b, x);
     } while (max_c > tol && ++l < 20);
+}
+
+#else
+
+//Kernel Z-faces (top and bottom)
+__global__ void set_bnd_Z(int M, int N, int O, int b, float *x) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x + 1;
+  int j = blockIdx.y * blockDim.y + threadIdx.y + 1;
+
+  if (i <= M && j <= N) {
+    x[IX(i, j, 0)] = (b == 3) ? -x[IX(i, j, 1)] : x[IX(i, j, 1)];
+    x[IX(i, j, O + 1)] = (b == 3) ? -x[IX(i, j, O)] : x[IX(i, j, O)];
+  }
+}
+
+//Kernel X-Faces (left and right)
+__global__ void set_bnd_X(int M, int N, int O, int b, float *x) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x + 1;
+  int j = blockIdx.y * blockDim.y + threadIdx.y + 1;
+
+  if (i <= N && j <= O) {
+    x[IX(0, i, j)] = (b == 1) ? -x[IX(1, i, j)] : x[IX(1, i, j)];
+    x[IX(M + 1, i, j)] = (b == 1) ? -x[IX(M, i, j)] : x[IX(M, i, j)];
+  }
+}
+
+//Kernel for Y-Faces (front and back)
+__global__ void set_bnd_Y(int M, int N, int O, int b, float *x) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x + 1;
+  int j = blockIdx.y * blockDim.y + threadIdx.y + 1;
+
+  if (i <= M && j <= O) {
+    x[IX(i, 0, j)] = (b == 2) ? -x[IX(i, 1, j)]: x[IX(i, 1, j)];
+    x[IX(i, N + 1, j)] = (b == 2) ? -x[IX(i, N, j)] :  x[IX(i, N, j)];
+  }
+}
+
+// Kernel for corners
+__global__ void set_bnd_corners(int M, int N, int O, float *x) {
+  if (threadIdx.x == 0 && blockIdx.x == 0) {
+    x[IX(0, 0, 0)] = 0.33f * (x[IX(1, 0, 0)] + x[IX(0, 1, 0)] + x[IX(0, 0, 1)]);
+
+    x[IX(M + 1, 0, 0)] =
+        0.33f * (x[IX(M, 0, 0)] + x[IX(M + 1, 1, 0)] + x[IX(M + 1, 0, 1)]);
+
+    x[IX(0, N + 1, 0)] =
+        0.33f * (x[IX(1, N + 1, 0)] + x[IX(0, N, 0)] + x[IX(0, N + 1, 1)]);
+
+    x[IX(M + 1, N + 1, 0)] = 0.33f * (x[IX(M, N + 1, 0)] + x[IX(M + 1, N, 0)] +
+                                      x[IX(M + 1, N + 1, 1)]);
+  }
+}
+
+
+void set_bnd_cuda(int M, int N, int O, int b, float *x) {
+  dim3 blockDim(16, 16);
+
+  //Z-face
+  dim3 gridDimZ((M + blockDim.x - 1) / blockDim.x,
+                 (N + blockDim.y - 1) / blockDim.y);
+  set_bnd_Z<<<gridDimZ, blockDim>>>(M, N, O, b, x);
+
+  //X-face
+  dim3 gridDimX((N + blockDim.x - 1) / blockDim.x,
+                 (O + blockDim.y - 1) / blockDim.y);
+  set_bnd_X<<<gridDimX, blockDim>>>(M, N, O, b, x);
+
+  //Y-Face
+  dim3 gridDimY((M + blockDim.x - 1) / blockDim.x,
+                 (O + blockDim.y - 1) / blockDim.y);
+  set_bnd_Y<<<gridDimY, blockDim>>>(M, N, O, b, x);
+
+  //Corners
+  set_bnd_corners<<<1, 1>>>(M, N, O, x);
+}
+
+// Kernel for computing the red or black points
+__global__ void red_black_kernel(int M, int N, int O, float* x, const float* x0, float a, float c, bool isRed, float* maxChange) {
+    // Compute 3D thread ID
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+    int k = blockIdx.z * blockDim.z + threadIdx.z;
+
+    // Ensure within bounds and check for red/black points
+    if (i <= 0 || j <= 0 || k <= 0 || i >= M || j >= N || k >= O || (i + j + k) % 2 != isRed)
+        return;
+
+    int idx = IX(i, j, k);
+    float old_x = x[idx];
+    x[idx] = (x0[idx] +
+              a * (x[IX(i - 1, j, k)] + x[IX(i + 1, j, k)] +
+                   x[IX(i, j - 1, k)] + x[IX(i, j + 1, k)] +
+                   x[IX(i, j, k - 1)] + x[IX(i, j, k + 1)])) /
+             c;
+
+    // Calculate the change and atomically update maxChange
+    float change = fabsf(x[idx] - old_x);
+    atomicMax((int *)maxChange, __float_as_int(change));
+}
+
+void lin_solve(int M, int N, int O, int b, float* x, float* x0, float a, float c) {
+    // Allocate device memory
+    float *d_x, *d_x0, *d_maxChange;
+    cudaMalloc((void**)&d_x, sizeof(float) * (M + 2) * (N + 2) * (O + 2));
+    cudaMalloc((void**)&d_x0, sizeof(float) * (M + 2) * (N + 2) * (O + 2));
+    cudaMalloc((void**)&d_maxChange, sizeof(float));
+
+    // Copy data to device
+    cudaMemcpy(d_x, x, sizeof(float) * (M + 2) * (N + 2) * (O + 2), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_x0, x0, sizeof(float) * (M + 2) * (N + 2) * (O + 2), cudaMemcpyHostToDevice);
+
+    // Define block and grid sizes
+    dim3 blockDim(8, 8, 8);
+    dim3 gridDim((M + 7) / 8, (N + 7) / 8, (O + 7) / 8);
+
+    float tol = 1e-7f, maxChange;
+    int l = 0;
+
+    do {
+        maxChange = 0.0f;
+        cudaMemcpy(d_maxChange, &maxChange, sizeof(float), cudaMemcpyHostToDevice);
+
+        // Launch kernel for red points
+        red_black_kernel<<<gridDim, blockDim>>>(M, N, O, d_x, d_x0, a, c, true, d_maxChange);
+        cudaDeviceSynchronize();
+        cudaError_t err = cudaGetLastError();
+        if (err != cudaSuccess) {
+            std::cout << "CUDA error after kernel launch (red): " << cudaGetErrorString(err) << std::endl;
+        }
+
+        // Launch kernel for black points
+        red_black_kernel<<<gridDim, blockDim>>>(M, N, O, d_x, d_x0, a, c, false, d_maxChange);
+        cudaDeviceSynchronize();
+        err = cudaGetLastError();
+        if (err != cudaSuccess) {
+            std::cout << "CUDA error after kernel launch (black): " << cudaGetErrorString(err) << std::endl;
+        }
+
+        set_bnd_cuda(M, N, O, b, d_x);
+
+        // Copy maxChange back to host
+        cudaMemcpy(&maxChange, d_maxChange, sizeof(float), cudaMemcpyDeviceToHost);
+
+    } while (maxChange > tol && ++l < 20);
+
+    // Copy results back to host
+    cudaMemcpy(x, d_x, sizeof(float) * (M + 2) * (N + 2) * (O + 2), cudaMemcpyDeviceToHost);
+
+    // Free device memory
+    cudaFree(d_x);
+    cudaFree(d_x0);
+    cudaFree(d_maxChange);
 }
 
 #endif

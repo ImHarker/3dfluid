@@ -1,6 +1,6 @@
-CPP = g++ 
-SRCS = main.cpp fluid_solver.cpp EventManager.cpp
-FLAGS = -Wall -Ofast -funroll-loops -ftree-vectorize -mtune=native -march=native -fopenmp 
+CPP = nvcc
+SRCS = main.cpp fluid_solver.cu EventManager.cpp
+FLAGS = -O3 -lcuda -lm -arch=sm_35
 FLAGS_PROFILE = -pg -g -fno-omit-frame-pointer
 
 THREADS = 16

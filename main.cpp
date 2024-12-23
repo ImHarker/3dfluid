@@ -4,7 +4,7 @@
 #include "EventManager.h"
 #include "fluid_solver.h"
 
-#define SIZE 84
+#define SIZE 168
 
 #define IX(i, j, k) ((i) + (M + 2) * (j) + (M + 2) * (N + 2) * (k))
 
