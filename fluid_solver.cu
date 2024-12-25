@@ -310,6 +310,9 @@ void set_bnd_cuda(int M, int N, int O, int b, float *x) {
 
 // Kernel for computing the red or black points
 __global__ void red_black_kernel(int M, int N, int O, float* x, const float* x0, float a, float c, bool isRed, float* maxChange) {
+    __shared__ float shared_max[8*8*8];
+    float local_max = 0;
+    int tid = threadIdx.x + threadIdx.y * blockDim.x + threadIdx.z * blockDim.x * blockDim.y;
     // Compute 3D thread ID
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     int j = blockIdx.y * blockDim.y + threadIdx.y;
@@ -327,9 +330,25 @@ __global__ void red_black_kernel(int M, int N, int O, float* x, const float* x0,
                    x[IX(i, j, k - 1)] + x[IX(i, j, k + 1)])) /
              c;
 
-    // Calculate the change and atomically update maxChange
+    // Calculate the change
     float change = fabsf(x[idx] - old_x);
-    atomicMax((int *)maxChange, __float_as_int(change));
+    local_max = fmaxf(local_max, change);
+
+    shared_max[tid] = local_max;
+    __syncthreads();
+
+    // Reduction
+    for (int stride = (blockDim.x * blockDim.y * blockDim.z) >> 1; stride > 0; stride >>= 1) {
+        if (tid < stride) {
+            shared_max[tid] = max(shared_max[tid], shared_max[tid + stride]);
+        }
+        __syncthreads();
+    }
+
+    // Write maxChange to global memory
+    if (tid == 0) {
+        atomicMax((int *)maxChange, __float_as_int(shared_max[0]));
+    }
 }
 
 void lin_solve(int M, int N, int O, int b, float* x, float* x0, float a, float c) {
@@ -352,23 +371,11 @@ void lin_solve(int M, int N, int O, int b, float* x, float* x0, float a, float c
 
     do {
         maxChange = 0.0f;
-        cudaMemcpy(d_maxChange, &maxChange, sizeof(float), cudaMemcpyHostToDevice);
-
+        cudaMemset(d_maxChange, 0, sizeof(float));
         // Launch kernel for red points
         red_black_kernel<<<gridDim, blockDim>>>(M, N, O, d_x, d_x0, a, c, true, d_maxChange);
-        cudaDeviceSynchronize();
-        cudaError_t err = cudaGetLastError();
-        if (err != cudaSuccess) {
-            std::cout << "CUDA error after kernel launch (red): " << cudaGetErrorString(err) << std::endl;
-        }
-
         // Launch kernel for black points
         red_black_kernel<<<gridDim, blockDim>>>(M, N, O, d_x, d_x0, a, c, false, d_maxChange);
-        cudaDeviceSynchronize();
-        err = cudaGetLastError();
-        if (err != cudaSuccess) {
-            std::cout << "CUDA error after kernel launch (black): " << cudaGetErrorString(err) << std::endl;
-        }
 
         set_bnd_cuda(M, N, O, b, d_x);
 
