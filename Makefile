@@ -1,6 +1,6 @@
 CPP = nvcc
 SRCS = main.cpp fluid_solver.cu EventManager.cpp
-FLAGS = -O3 -lcuda -lm -arch=sm_35
+FLAGS = -O3 -lcuda -lm -arch=sm_35 -use_fast_math -Xptxas="-dlcm=ca"
 FLAGS_PROFILE = -pg -g -fno-omit-frame-pointer
 
 THREADS = 16

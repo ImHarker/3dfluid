@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --time=5:00
+#SBATCH --time=2:00
 #SBATCH --partition=day
 #SBATCH --constraint=k20
 
