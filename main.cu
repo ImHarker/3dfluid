@@ -86,59 +86,27 @@ void apply_events(const std::vector<Event> &events) {
     cudaMalloc(&d_events, events.size() * sizeof(Event));
     cudaMemcpy(d_events, events.data(), events.size() * sizeof(Event), cudaMemcpyHostToDevice);
 
-    int blockSize = 256;
+    int blockSize = 128;
     int numBlocks = (events.size() + blockSize - 1) / blockSize;
     apply_events_kernel<<<numBlocks, blockSize>>>(dens, u, v, w, d_events, events.size());
 
     cudaFree(d_events);
 }
 
-
 // Function to sum the total density
-__global__ void sum_density_kernel(float *dens, float *partial_sums, int size) {
-    extern __shared__ float sdata[];
-    int tid = threadIdx.x;
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-
-    // Load elements into shared memory
-    sdata[tid] = (idx < size) ? dens[idx] : 0.0f;
-    __syncthreads();
-
-    // Perform reduction
-    for (int stride = blockDim.x / 2; stride > 0; stride >>= 1) {
-        if (tid < stride) {
-            sdata[tid] += sdata[tid + stride];
-        }
-        __syncthreads();
-    }
-
-    // Write the result of this block to the partial sums array
-    if (tid == 0) {
-        partial_sums[blockIdx.x] = sdata[0];
-    }
-}
-
 float sum_density() {
     int size = (M + 2) * (N + 2) * (O + 2);
-    int blockSize = 256;
-    int numBlocks = (size + blockSize - 1) / blockSize;
-    float *d_partial_sums, *partial_sums, total_density = 0.0f;
 
-    cudaMalloc(&d_partial_sums, numBlocks * sizeof(float));
-    partial_sums = (float *)malloc(numBlocks * sizeof(float));
+    std::vector<float> temp(size);
 
-    sum_density_kernel<<<numBlocks, blockSize, blockSize * sizeof(float)>>>(dens, d_partial_sums, size);
-    cudaMemcpy(partial_sums, d_partial_sums, numBlocks * sizeof(float), cudaMemcpyDeviceToHost);
+    cudaMemcpy(temp.data(), dens, size * sizeof(float), cudaMemcpyDeviceToHost);
 
-    for (int i = 0; i < numBlocks; i++) {
-        total_density += partial_sums[i];
+    float total = 0;
+    for (int i = 0; i < size; i++) {
+        total += temp[i];
     }
-
-    cudaFree(d_partial_sums);
-    free(partial_sums);
-    return total_density;
+    return total;
 }
-
 
 // Simulation loop
 void simulate(EventManager &eventManager, int timesteps) {
