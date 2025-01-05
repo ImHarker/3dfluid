@@ -3,4 +3,4 @@
 #SBATCH --partition=day
 #SBATCH --constraint=k20
 
-time nvprof ./fluid_sim
+time ./fluid_sim
